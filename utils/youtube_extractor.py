@@ -1,7 +1,7 @@
 """
 Music 10 - Módulo Extrator de YouTube para MP3 (yt-dlp + FFmpeg)
 Permite obter informações rápidas de vídeos e extrair áudio com bitrate configurável,
-com suporte a bypass de bot do YouTube e URLs do YouTube Music.
+com suporte a bypass de bot do YouTube, URLs do YouTube Music e suporte a Cookies no Streamlit Cloud.
 """
 
 import os
@@ -12,6 +12,31 @@ from typing import Dict, Any, Optional
 from urllib.parse import urlparse, parse_qs, urlunparse
 from .ffmpeg_config import get_ffmpeg_path
 
+def get_cookie_file_path() -> Optional[str]:
+    """
+    Verifica se existem cookies do YouTube configurados no Streamlit Cloud (st.secrets)
+    ou em um arquivo cookies.txt no diretório do projeto.
+    """
+    # 1. Arquivo cookies.txt local
+    local_cookies = os.path.join(os.path.dirname(os.path.dirname(__file__)), "cookies.txt")
+    if os.path.exists(local_cookies) and os.path.getsize(local_cookies) > 10:
+        return local_cookies
+
+    # 2. st.secrets no Streamlit Cloud
+    try:
+        import streamlit as st
+        if hasattr(st, "secrets") and "YOUTUBE_COOKIES" in st.secrets:
+            cookie_content = st.secrets["YOUTUBE_COOKIES"]
+            if cookie_content and len(cookie_content.strip()) > 10:
+                temp_cookie = os.path.join(tempfile.gettempdir(), "yt_cloud_cookies.txt")
+                with open(temp_cookie, "w", encoding="utf-8") as f:
+                    f.write(cookie_content.strip())
+                return temp_cookie
+    except Exception:
+        pass
+
+    return None
+
 def normalize_youtube_url(raw_url: str) -> str:
     """
     Normaliza links do YouTube (music.youtube.com, youtu.be, shorts, etc.)
@@ -21,29 +46,20 @@ def normalize_youtube_url(raw_url: str) -> str:
         return ""
     
     url = raw_url.strip()
-    
-    # Extrai o video ID
     video_id = None
     
-    # youtu.be/ID
     if "youtu.be/" in url:
         match = re.search(r"youtu\.be/([a-zA-Z0-9_-]{11})", url)
         if match:
             video_id = match.group(1)
-            
-    # /shorts/ID
     elif "/shorts/" in url:
         match = re.search(r"/shorts/([a-zA-Z0-9_-]{11})", url)
         if match:
             video_id = match.group(1)
-            
-    # watch?v=ID (em youtube.com ou music.youtube.com)
     elif "watch?" in url or "watch" in url:
         match = re.search(r"v=([a-zA-Z0-9_-]{11})", url)
         if match:
             video_id = match.group(1)
-            
-    # /embed/ID ou /v/ID
     elif "/embed/" in url or "/v/" in url:
         match = re.search(r"/(?:embed|v)/([a-zA-Z0-9_-]{11})", url)
         if match:
@@ -52,10 +68,8 @@ def normalize_youtube_url(raw_url: str) -> str:
     if video_id:
         return f"https://www.youtube.com/watch?v={video_id}"
 
-    # Fallback: remove query parameters não essenciais
     try:
         parsed = urlparse(url)
-        # Substitui music.youtube.com por www.youtube.com
         netloc = "www.youtube.com" if "youtube.com" in parsed.netloc else parsed.netloc
         qs = parse_qs(parsed.query)
         v = qs.get("v", [""])[0]
@@ -83,11 +97,11 @@ def format_duration(seconds: Optional[int]) -> str:
 def extract_video_info(url: str) -> Dict[str, Any]:
     """
     Obtém metadados rápidos do vídeo do YouTube sem fazer o download completo.
-    Utiliza clientes android/ios para contornar verificações de bot.
     """
     import yt_dlp
 
     clean_url = normalize_youtube_url(url)
+    cookie_path = get_cookie_file_path()
 
     ydl_opts = {
         "quiet": True,
@@ -97,12 +111,20 @@ def extract_video_info(url: str) -> Dict[str, Any]:
         "ffmpeg_location": get_ffmpeg_path(),
         "extractor_args": {
             "youtube": {
-                "player_client": ["android", "ios", "mweb", "web"]
+                "player_client": ["android", "ios", "mweb", "web"],
+                "player_skip": ["webpage", "configs"]
             }
+        },
+        "http_headers": {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
+            "Accept-Language": "pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7",
         },
         "nocheckcertificate": True,
         "geo_bypass": True,
     }
+
+    if cookie_path:
+        ydl_opts["cookiefile"] = cookie_path
 
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -125,7 +147,6 @@ def extract_video_info(url: str) -> Dict[str, Any]:
                 inferred_artist = parts[0].strip()
                 inferred_title = parts[1].strip()
 
-            # Limpa sufixos comuns em títulos de clipes como (Official Video), [Audio], etc.
             clean_inferred_title = re.sub(r"\s*[\(\[](?:Official\s*(?:Music\s*)?Video|Audio|Lyric\s*Video|Clipe\s*Oficial|Video\s*Oficial)[\)\]]", "", inferred_title, flags=re.IGNORECASE).strip()
 
             return {
@@ -144,7 +165,7 @@ def extract_video_info(url: str) -> Dict[str, Any]:
     except Exception as e:
         err_msg = str(e)
         if "Sign in to confirm" in err_msg or "bot" in err_msg.lower():
-            err_msg = "O YouTube solicitou verificação para esta URL. Tente novamente em instantes."
+            err_msg = "O YouTube bloqueou a requisição na nuvem por IP de servidor (verificação de bot)."
         return {
             "success": False,
             "error": f"Erro ao processar URL: {err_msg}"
@@ -164,11 +185,12 @@ def download_audio_from_youtube(
     clean_url = normalize_youtube_url(url)
     ffmpeg_bin = get_ffmpeg_path()
     temp_dir = tempfile.mkdtemp(prefix="music10_yt_")
+    cookie_path = get_cookie_file_path()
 
     out_template = os.path.join(temp_dir, "%(title)s.%(ext)s")
 
     ydl_opts = {
-        "format": "ba/b",
+        "format": "ba/b/best",
         "outtmpl": out_template,
         "ffmpeg_location": ffmpeg_bin,
         "postprocessors": [
@@ -180,14 +202,22 @@ def download_audio_from_youtube(
         ],
         "extractor_args": {
             "youtube": {
-                "player_client": ["android", "ios", "mweb", "web"]
+                "player_client": ["android", "ios", "mweb", "web"],
+                "player_skip": ["webpage", "configs"]
             }
+        },
+        "http_headers": {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
+            "Accept-Language": "pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7",
         },
         "nocheckcertificate": True,
         "geo_bypass": True,
         "quiet": True,
         "no_warnings": True,
     }
+
+    if cookie_path:
+        ydl_opts["cookiefile"] = cookie_path
 
     if progress_hook:
         ydl_opts["progress_hooks"] = [progress_hook]
@@ -251,14 +281,13 @@ def download_audio_from_youtube(
 
     except Exception as e:
         err_msg = str(e)
-        if "Sign in to confirm" in err_msg or "bot" in err_msg.lower():
-            err_msg = "O YouTube bloqueou temporariamente a requisição com verificação de bot. Tente novamente em alguns segundos."
+        if "Sign in to confirm" in err_msg or "bot" in err_msg.lower() or "429" in err_msg:
+            err_msg = "O YouTube bloqueou a requisição nesta hospedagem em nuvem (IP de Datacenter). No Streamlit Cloud, é recomendado adicionar os cookies do YouTube nos Secrets da aplicação."
         return {
             "success": False,
             "error": f"Erro durante a extração/conversão: {err_msg}"
         }
     finally:
-        # Limpa o diretório temporário
         try:
             for item in os.listdir(temp_dir):
                 item_path = os.path.join(temp_dir, item)
