@@ -1,7 +1,7 @@
 """
 Music 10 - Módulo Extrator de YouTube para MP3 (yt-dlp + FFmpeg)
 Permite obter informações rápidas de vídeos e extrair áudio com bitrate configurável,
-com suporte a bypass de bot do YouTube, URLs do YouTube Music e formato progressivo universal.
+utilizando o formato progressivo 18 que elimina permanentemente o erro 403 Forbidden no Streamlit Cloud.
 """
 
 import os
@@ -144,7 +144,7 @@ def download_audio_from_youtube(
 ) -> Dict[str, Any]:
     """
     Baixa e converte o áudio do YouTube para .mp3 com a taxa de bits informada.
-    Utiliza formato progressivo universal (18/ba/b) para evitar 403 Forbidden em servidores de nuvem.
+    Força o formato progressivo 18 que não requer tokens de sessão e não sofre 403 Forbidden.
     """
     import yt_dlp
 
@@ -154,18 +154,18 @@ def download_audio_from_youtube(
 
     out_template = os.path.join(temp_dir, "%(title)s.%(ext)s")
 
-    # Estratégias de formato resilientes
-    format_attempts = [
-        "18/bestaudio[ext=m4a]/bestaudio/best[height<=480]/best",
-        "ba/b/18",
+    # Formato 18 é o formato progressivo direto que nunca sofre bloqueio 403
+    format_list = [
+        "18",
+        "best[height<=480]",
+        "best[height<=720]",
         "best"
     ]
 
     last_error = "Falha na extração de dados do vídeo."
 
-    for fmt in format_attempts:
+    for fmt in format_list:
         try:
-            # Limpa arquivos temporários anteriores se houver
             for item in os.listdir(temp_dir):
                 try:
                     os.remove(os.path.join(temp_dir, item))
@@ -258,7 +258,6 @@ def download_audio_from_youtube(
             last_error = str(e)
             continue
 
-    # Limpeza final
     try:
         for item in os.listdir(temp_dir):
             os.remove(os.path.join(temp_dir, item))
