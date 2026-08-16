@@ -1,7 +1,7 @@
 """
 Music 10 - Módulo Extrator de YouTube para MP3 (yt-dlp + FFmpeg)
 Permite obter informações rápidas de vídeos e extrair áudio com bitrate configurável,
-com suporte a bypass de bot do YouTube, URLs do YouTube Music e fallback multi-estratégia.
+com suporte a bypass de bot do YouTube, URLs do YouTube Music e formato progressivo universal.
 """
 
 import os
@@ -11,33 +11,6 @@ import requests
 from typing import Dict, Any, Optional
 from urllib.parse import urlparse, parse_qs, urlunparse
 from .ffmpeg_config import get_ffmpeg_path
-
-def get_cookie_file_path() -> Optional[str]:
-    """
-    Verifica se existem cookies do YouTube configurados no Streamlit Cloud (st.secrets)
-    ou em um arquivo cookies.txt no diretório do projeto.
-    """
-    local_cookies = os.path.join(os.path.dirname(os.path.dirname(__file__)), "cookies.txt")
-    if os.path.exists(local_cookies) and os.path.getsize(local_cookies) > 10:
-        return local_cookies
-
-    test_cookies = os.path.join(os.path.dirname(os.path.dirname(__file__)), "test_cookies.txt")
-    if os.path.exists(test_cookies) and os.path.getsize(test_cookies) > 10:
-        return test_cookies
-
-    try:
-        import streamlit as st
-        if hasattr(st, "secrets") and "YOUTUBE_COOKIES" in st.secrets:
-            cookie_content = st.secrets["YOUTUBE_COOKIES"]
-            if cookie_content and len(cookie_content.strip()) > 10:
-                temp_cookie = os.path.join(tempfile.gettempdir(), "yt_cloud_cookies.txt")
-                with open(temp_cookie, "w", encoding="utf-8") as f:
-                    f.write(cookie_content.strip())
-                return temp_cookie
-    except Exception:
-        pass
-
-    return None
 
 def normalize_youtube_url(raw_url: str) -> str:
     """
@@ -103,88 +76,66 @@ def extract_video_info(url: str) -> Dict[str, Any]:
     import yt_dlp
 
     clean_url = normalize_youtube_url(url)
-    cookie_path = get_cookie_file_path()
 
-    # Tenta obter info com estratégias resilientes
-    strategies = [
-        # Estratégia 1: Cliente Android (mais estável e sem 403)
-        {
-            "player_client": ["android", "web"],
-            "use_cookie": False
-        },
-        # Estratégia 2: Com Cookies se disponíveis
-        {
-            "player_client": ["web", "mweb"],
-            "use_cookie": True
-        }
-    ]
-
-    last_error = "Não foi possível obter dados do vídeo."
-
-    for strat in strategies:
-        try:
-            ydl_opts = {
-                "quiet": True,
-                "no_warnings": True,
-                "extract_flat": False,
-                "skip_download": True,
-                "ffmpeg_location": get_ffmpeg_path(),
-                "extractor_args": {
-                    "youtube": {
-                        "player_client": strat["player_client"]
-                    }
-                },
-                "http_headers": {
-                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
-                    "Accept-Language": "pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7",
-                },
-                "nocheckcertificate": True,
-                "geo_bypass": True,
+    ydl_opts = {
+        "quiet": True,
+        "no_warnings": True,
+        "extract_flat": False,
+        "skip_download": True,
+        "ffmpeg_location": get_ffmpeg_path(),
+        "extractor_args": {
+            "youtube": {
+                "player_client": ["android", "web"]
             }
-
-            if strat["use_cookie"] and cookie_path:
-                ydl_opts["cookiefile"] = cookie_path
-
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                info = ydl.extract_info(clean_url, download=False)
-                if info:
-                    title = info.get("title", "Áudio sem título")
-                    uploader = info.get("uploader") or info.get("channel", "Artista Desconhecido")
-                    duration = info.get("duration", 0)
-                    thumbnail = info.get("thumbnail", "")
-                    view_count = info.get("view_count", 0)
-                    description = info.get("description", "")
-
-                    inferred_artist = uploader
-                    inferred_title = title
-                    if " - " in title:
-                        parts = title.split(" - ", 1)
-                        inferred_artist = parts[0].strip()
-                        inferred_title = parts[1].strip()
-
-                    clean_inferred_title = re.sub(r"\s*[\(\[](?:Official\s*(?:Music\s*)?Video|Audio|Lyric\s*Video|Clipe\s*Oficial|Video\s*Oficial)[\)\]]", "", inferred_title, flags=re.IGNORECASE).strip()
-
-                    return {
-                        "success": True,
-                        "clean_url": clean_url,
-                        "title": title,
-                        "inferred_title": clean_inferred_title or inferred_title,
-                        "inferred_artist": inferred_artist,
-                        "uploader": uploader,
-                        "duration": duration,
-                        "duration_formatted": format_duration(duration),
-                        "thumbnail": thumbnail,
-                        "view_count": view_count,
-                        "description": description[:300] + "..." if len(description) > 300 else description
-                    }
-        except Exception as e:
-            last_error = str(e)
-            continue
-
-    return {
-        "success": False,
-        "error": f"Erro ao processar URL: {last_error}"
+        },
+        "http_headers": {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
+            "Accept-Language": "pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7",
+        },
+        "nocheckcertificate": True,
+        "geo_bypass": True,
     }
+
+    try:
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(clean_url, download=False)
+            if not info:
+                return {"success": False, "error": "Não foi possível obter dados do vídeo."}
+
+            title = info.get("title", "Áudio sem título")
+            uploader = info.get("uploader") or info.get("channel", "Artista Desconhecido")
+            duration = info.get("duration", 0)
+            thumbnail = info.get("thumbnail", "")
+            view_count = info.get("view_count", 0)
+            description = info.get("description", "")
+
+            inferred_artist = uploader
+            inferred_title = title
+            if " - " in title:
+                parts = title.split(" - ", 1)
+                inferred_artist = parts[0].strip()
+                inferred_title = parts[1].strip()
+
+            clean_inferred_title = re.sub(r"\s*[\(\[](?:Official\s*(?:Music\s*)?Video|Audio|Lyric\s*Video|Clipe\s*Oficial|Video\s*Oficial)[\)\]]", "", inferred_title, flags=re.IGNORECASE).strip()
+
+            return {
+                "success": True,
+                "clean_url": clean_url,
+                "title": title,
+                "inferred_title": clean_inferred_title or inferred_title,
+                "inferred_artist": inferred_artist,
+                "uploader": uploader,
+                "duration": duration,
+                "duration_formatted": format_duration(duration),
+                "thumbnail": thumbnail,
+                "view_count": view_count,
+                "description": description[:300] + "..." if len(description) > 300 else description
+            }
+    except Exception as e:
+        return {
+            "success": False,
+            "error": f"Erro ao processar URL: {str(e)}"
+        }
 
 def download_audio_from_youtube(
     url: str,
@@ -193,42 +144,26 @@ def download_audio_from_youtube(
 ) -> Dict[str, Any]:
     """
     Baixa e converte o áudio do YouTube para .mp3 com a taxa de bits informada.
-    Utiliza fallback multi-cliente para evitar erros 403 Forbidden e bloqueios de bot.
+    Utiliza formato progressivo universal (18/ba/b) para evitar 403 Forbidden em servidores de nuvem.
     """
     import yt_dlp
 
     clean_url = normalize_youtube_url(url)
     ffmpeg_bin = get_ffmpeg_path()
     temp_dir = tempfile.mkdtemp(prefix="music10_yt_")
-    cookie_path = get_cookie_file_path()
 
     out_template = os.path.join(temp_dir, "%(title)s.%(ext)s")
 
-    # Lista de estratégias de download ordenadas por resiliência
-    strategies = [
-        # Estratégia 1: Cliente Android com formato abrangente (evita 403 Forbidden do iOS/mweb)
-        {
-            "format": "bestaudio/best/18/140/251",
-            "player_client": ["android", "web"],
-            "use_cookie": False
-        },
-        # Estratégia 2: Com Cookies do usuário se configurados
-        {
-            "format": "bestaudio/best/18/140/251",
-            "player_client": ["web", "mweb", "web_creator"],
-            "use_cookie": True
-        },
-        # Estratégia 3: Fallback padrão
-        {
-            "format": "ba/b/18",
-            "player_client": ["android"],
-            "use_cookie": False
-        }
+    # Estratégias de formato resilientes
+    format_attempts = [
+        "18/bestaudio[ext=m4a]/bestaudio/best[height<=480]/best",
+        "ba/b/18",
+        "best"
     ]
 
     last_error = "Falha na extração de dados do vídeo."
 
-    for strat in strategies:
+    for fmt in format_attempts:
         try:
             # Limpa arquivos temporários anteriores se houver
             for item in os.listdir(temp_dir):
@@ -238,7 +173,7 @@ def download_audio_from_youtube(
                     pass
 
             ydl_opts = {
-                "format": strat["format"],
+                "format": fmt,
                 "outtmpl": out_template,
                 "ffmpeg_location": ffmpeg_bin,
                 "postprocessors": [
@@ -250,7 +185,7 @@ def download_audio_from_youtube(
                 ],
                 "extractor_args": {
                     "youtube": {
-                        "player_client": strat["player_client"]
+                        "player_client": ["android", "web"]
                     }
                 },
                 "http_headers": {
@@ -262,9 +197,6 @@ def download_audio_from_youtube(
                 "quiet": True,
                 "no_warnings": True,
             }
-
-            if strat["use_cookie"] and cookie_path:
-                ydl_opts["cookiefile"] = cookie_path
 
             if progress_hook:
                 ydl_opts["progress_hooks"] = [progress_hook]
