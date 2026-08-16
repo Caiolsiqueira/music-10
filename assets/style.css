@@ -1,0 +1,366 @@
+/* ==========================================================================
+   Music 10 - Custom Responsive Stylesheet (Dark Studio Exclusivo)
+   ========================================================================== */
+
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+:root, .stApp {
+  --font-main: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 18px;
+  --radius-xl: 24px;
+  --transition-fast: 0.2s ease;
+  --transition-normal: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* Dark Studio Palette */
+  --bg-app: #0e1117;
+  --bg-card: #181c24;
+  --bg-card-hover: #1f242e;
+  --bg-subtle: #232834;
+  --border-color: rgba(255, 255, 255, 0.08);
+  --border-focus: #1db954;
+  --text-main: #f8fafc;
+  --text-muted: #94a3b8;
+  --accent-primary: #1db954;
+  --accent-primary-hover: #1aa34a;
+  --accent-secondary: #0ea5e9;
+  --accent-gradient: linear-gradient(135deg, #1db954 0%, #0ea5e9 100%);
+  --accent-warning: #f59e0b;
+  --accent-danger: #ef4444;
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 16px 36px rgba(0, 0, 0, 0.5);
+  --badge-bg: rgba(29, 185, 84, 0.15);
+  --badge-text: #4ade80;
+}
+
+/* Base Body Styling */
+body, .stApp {
+  font-family: var(--font-main) !important;
+  background-color: #0e1117 !important;
+  color: #f8fafc !important;
+}
+
+[data-testid="stSidebar"] {
+  background-color: #161a23 !important;
+  border-right: 1px solid rgba(255, 255, 255, 0.06) !important;
+}
+
+header[data-testid="stHeader"] {
+  background: rgba(14, 17, 23, 0.9) !important;
+}
+
+.stTextInput input, .stSelectbox [data-baseweb="select"], .stNumberInput input, .stTextArea textarea {
+  background-color: #1e2330 !important;
+  color: #f8fafc !important;
+  border-color: rgba(255, 255, 255, 0.12) !important;
+}
+
+.stTabs [data-baseweb="tab-list"] {
+  background-color: #181c24;
+  border-radius: 8px;
+  padding: 4px;
+}
+
+.stTabs [data-baseweb="tab"] {
+  color: #94a3b8;
+}
+
+.stTabs [aria-selected="true"] {
+  background-color: #232834 !important;
+  color: #1db954 !important;
+  font-weight: 700;
+  border-radius: 6px;
+}
+
+/* Main Container Max-Width and Padding */
+.main .block-container {
+  max-width: 1100px;
+  padding-top: 1.5rem;
+  padding-bottom: 3.5rem;
+  padding-left: 1.5rem;
+  padding-right: 1.5rem;
+}
+
+@media (max-width: 768px) {
+  .main .block-container {
+    padding-top: 1rem;
+    padding-bottom: 2rem;
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
+  }
+}
+
+/* Music 10 Brand Header */
+.music10-header-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  padding: 1.75rem 2rem;
+  margin-bottom: 2rem;
+  box-shadow: var(--shadow-md);
+  position: relative;
+  overflow: hidden;
+}
+
+.music10-header-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: var(--accent-gradient);
+}
+
+.music10-header-title {
+  font-size: 2rem;
+  font-weight: 800;
+  color: var(--text-main);
+  letter-spacing: -0.03em;
+  margin-bottom: 0.4rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.music10-header-subtitle {
+  font-size: 0.95rem;
+  color: var(--text-muted);
+  line-height: 1.5;
+  margin-bottom: 0;
+}
+
+/* Glass & Studio Cards */
+.music10-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 1.5rem;
+  margin-bottom: 1.25rem;
+  box-shadow: var(--shadow-sm);
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.music10-card:hover {
+  box-shadow: var(--shadow-md);
+}
+
+/* Feature Grid Cards */
+.music10-feature-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  padding: 1.5rem;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  box-shadow: var(--shadow-sm);
+  transition: all var(--transition-normal);
+  text-decoration: none;
+}
+
+.music10-feature-card:hover {
+  transform: translateY(-4px);
+  border-color: var(--accent-primary);
+  box-shadow: var(--shadow-md);
+}
+
+.music10-feature-icon {
+  font-size: 2.2rem;
+  margin-bottom: 1rem;
+  display: inline-block;
+}
+
+.music10-feature-title {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--text-main);
+  margin-bottom: 0.5rem;
+}
+
+.music10-feature-desc {
+  font-size: 0.88rem;
+  color: var(--text-muted);
+  line-height: 1.5;
+  margin-bottom: 1.2rem;
+}
+
+/* Badges */
+.music10-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.25rem 0.75rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  background: var(--badge-bg);
+  color: var(--badge-text);
+  letter-spacing: 0.02em;
+}
+
+.music10-badge-blue {
+  background: rgba(14, 165, 233, 0.15);
+  color: #38bdf8;
+}
+
+.music10-badge-amber {
+  background: rgba(245, 158, 11, 0.15);
+  color: #fbbf24;
+}
+
+/* Status Pill / Session State Ribbon */
+.music10-session-ribbon {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-left: 4px solid var(--accent-primary);
+  border-radius: var(--radius-md);
+  padding: 1rem 1.25rem;
+  margin-bottom: 1.5rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.music10-session-info {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.music10-session-title {
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: var(--text-main);
+}
+
+.music10-session-meta {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+/* Stats Comparison Widget */
+.music10-compare-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 1rem;
+  margin: 1rem 0;
+}
+
+.music10-stat-box {
+  background: var(--bg-subtle);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 1rem;
+  text-align: center;
+}
+
+.music10-stat-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.35rem;
+}
+
+.music10-stat-value {
+  font-size: 1.35rem;
+  font-weight: 800;
+  color: var(--text-main);
+  font-family: var(--font-mono);
+}
+
+.music10-stat-saved {
+  color: var(--accent-primary) !important;
+}
+
+/* Media preview cards */
+.music10-preview-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.25rem;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 1.25rem;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.music10-preview-thumb {
+  width: 140px;
+  height: 140px;
+  border-radius: var(--radius-sm);
+  object-fit: cover;
+  flex-shrink: 0;
+  box-shadow: var(--shadow-sm);
+}
+
+.music10-preview-details {
+  flex: 1;
+  min-width: 220px;
+}
+
+.music10-preview-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--text-main);
+  margin-bottom: 0.35rem;
+  line-height: 1.3;
+}
+
+.music10-preview-meta {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  line-height: 1.6;
+}
+
+/* iTunes Search Candidate Card */
+.music10-itunes-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 0.85rem 1rem;
+  margin-bottom: 0.75rem;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  transition: border-color var(--transition-fast);
+}
+
+.music10-itunes-card:hover {
+  border-color: var(--accent-secondary);
+}
+
+.music10-itunes-cover {
+  width: 60px;
+  height: 60px;
+  border-radius: var(--radius-sm);
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+/* Mobile Adjustments */
+@media (max-width: 640px) {
+  .music10-header-card {
+    padding: 1.25rem 1rem;
+  }
+  .music10-header-title {
+    font-size: 1.5rem;
+  }
+  .music10-preview-thumb {
+    width: 100%;
+    height: 180px;
+  }
+  .music10-session-ribbon {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
