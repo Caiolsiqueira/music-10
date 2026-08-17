@@ -1,16 +1,26 @@
 """
 Music 10 - Módulo Extrator de YouTube para MP3 (yt-dlp + FFmpeg)
 Permite obter informações rápidas de vídeos e extrair áudio com bitrate configurável,
-utilizando o formato progressivo 18 que elimina permanentemente o erro 403 Forbidden no Streamlit Cloud.
+com suporte multiplataforma (Linux / Windows) utilizando pathlib e tempfile.
 """
 
 import os
 import re
+import shutil
 import tempfile
 import requests
+from pathlib import Path
 from typing import Dict, Any, Optional
 from urllib.parse import urlparse, parse_qs, urlunparse
 from .ffmpeg_config import get_ffmpeg_path
+
+# Cabeçalhos HTTP modernos e realistas para mitigar bloqueios de nuvem
+DEFAULT_HTTP_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+    "Accept-Language": "pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7",
+    "Sec-Fetch-Mode": "navigate",
+}
 
 def normalize_youtube_url(raw_url: str) -> str:
     """
@@ -55,7 +65,7 @@ def normalize_youtube_url(raw_url: str) -> str:
         return url
 
 def sanitize_filename(name: str) -> str:
-    """Remove caracteres inválidos para nomes de arquivos."""
+    """Remove caracteres inválidos para nomes de arquivos em qualquer SO."""
     clean = re.sub(r'[\\/*?:"<>|]', "", name)
     return clean.strip() or "track"
 
@@ -76,25 +86,26 @@ def extract_video_info(url: str) -> Dict[str, Any]:
     import yt_dlp
 
     clean_url = normalize_youtube_url(url)
+    ffmpeg_bin = get_ffmpeg_path()
 
     ydl_opts = {
         "quiet": True,
         "no_warnings": True,
         "extract_flat": False,
         "skip_download": True,
-        "ffmpeg_location": get_ffmpeg_path(),
+        "ffmpeg_location": ffmpeg_bin if ffmpeg_bin and ffmpeg_bin != "ffmpeg" else None,
         "extractor_args": {
             "youtube": {
                 "player_client": ["android", "web"]
             }
         },
-        "http_headers": {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
-            "Accept-Language": "pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7",
-        },
+        "http_headers": DEFAULT_HTTP_HEADERS,
         "nocheckcertificate": True,
         "geo_bypass": True,
     }
+
+    # Remove chaves com valor None
+    ydl_opts = {k: v for k, v in ydl_opts.items() if v is not None}
 
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -144,17 +155,17 @@ def download_audio_from_youtube(
 ) -> Dict[str, Any]:
     """
     Baixa e converte o áudio do YouTube para .mp3 com a taxa de bits informada.
-    Força o formato progressivo 18 que não requer tokens de sessão e não sofre 403 Forbidden.
+    Utiliza pathlib.Path e tempfile para total compatibilidade entre Windows e Linux.
     """
     import yt_dlp
 
     clean_url = normalize_youtube_url(url)
     ffmpeg_bin = get_ffmpeg_path()
-    temp_dir = tempfile.mkdtemp(prefix="music10_yt_")
+    
+    # Cria diretório temporário agnóstico ao SO
+    temp_dir = Path(tempfile.mkdtemp(prefix="music10_yt_"))
+    out_template = str(temp_dir / "%(title)s.%(ext)s")
 
-    out_template = os.path.join(temp_dir, "%(title)s.%(ext)s")
-
-    # Formato 18 é o formato progressivo direto que nunca sofre bloqueio 403
     format_list = [
         "18",
         "best[height<=480]",
@@ -166,16 +177,15 @@ def download_audio_from_youtube(
 
     for fmt in format_list:
         try:
-            for item in os.listdir(temp_dir):
-                try:
-                    os.remove(os.path.join(temp_dir, item))
-                except Exception:
-                    pass
+            # Limpa arquivos residuais do diretório temporário
+            for item in temp_dir.iterdir():
+                if item.is_file():
+                    item.unlink(missing_ok=True)
 
             ydl_opts = {
                 "format": fmt,
                 "outtmpl": out_template,
-                "ffmpeg_location": ffmpeg_bin,
+                "ffmpeg_location": ffmpeg_bin if ffmpeg_bin and ffmpeg_bin != "ffmpeg" else None,
                 "postprocessors": [
                     {
                         "key": "FFmpegExtractAudio",
@@ -188,15 +198,14 @@ def download_audio_from_youtube(
                         "player_client": ["android", "web"]
                     }
                 },
-                "http_headers": {
-                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
-                    "Accept-Language": "pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7",
-                },
+                "http_headers": DEFAULT_HTTP_HEADERS,
                 "nocheckcertificate": True,
                 "geo_bypass": True,
                 "quiet": True,
                 "no_warnings": True,
             }
+
+            ydl_opts = {k: v for k, v in ydl_opts.items() if v is not None}
 
             if progress_hook:
                 ydl_opts["progress_hooks"] = [progress_hook]
@@ -206,13 +215,12 @@ def download_audio_from_youtube(
                 if not info:
                     continue
 
-                mp3_files = [f for f in os.listdir(temp_dir) if f.endswith(".mp3")]
+                mp3_files = list(temp_dir.glob("*.mp3"))
                 if not mp3_files:
                     continue
 
-                mp3_filepath = os.path.join(temp_dir, mp3_files[0])
-                with open(mp3_filepath, "rb") as f:
-                    audio_bytes = f.read()
+                mp3_filepath = mp3_files[0]
+                audio_bytes = mp3_filepath.read_bytes()
 
                 title = info.get("title", "Audio_Extraido")
                 uploader = info.get("uploader") or info.get("channel", "Artista Desconhecido")
@@ -224,7 +232,7 @@ def download_audio_from_youtube(
                 cover_bytes = None
                 if thumbnail_url:
                     try:
-                        thumb_resp = requests.get(thumbnail_url, timeout=5)
+                        thumb_resp = requests.get(thumbnail_url, headers=DEFAULT_HTTP_HEADERS, timeout=5)
                         if thumb_resp.status_code == 200:
                             cover_bytes = thumb_resp.content
                     except Exception:
@@ -258,10 +266,9 @@ def download_audio_from_youtube(
             last_error = str(e)
             continue
 
+    # Limpeza segura do diretório temporário
     try:
-        for item in os.listdir(temp_dir):
-            os.remove(os.path.join(temp_dir, item))
-        os.rmdir(temp_dir)
+        shutil.rmtree(temp_dir, ignore_errors=True)
     except Exception:
         pass
 
