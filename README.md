@@ -1,3 +1,14 @@
+---
+title: Music 10 Studio Pro
+emoji: 🎵
+colorFrom: purple
+colorTo: blue
+sdk: streamlit
+sdk_version: 1.35.0
+app_file: app.py
+pinned: false
+---
+
 # 🎵 Music 10 - Studio de Áudio & Mídia
 
 Aplicação web interativa, moderna e responsiva construída em **Python** e **Streamlit**, projetada para download de vídeos e músicas do YouTube/YouTube Music em MP3, compressão de áudio e imagens, e organização profissional de tags ID3 e renomeação de arquivos em lote.
