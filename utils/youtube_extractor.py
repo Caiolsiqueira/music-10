@@ -293,8 +293,7 @@ def download_audio_from_youtube(
         "nocheckcertificate": True,
         "extractor_args": {
             "youtube": {
-                "player_client": ["android", "ios", "mweb"],
-                "player_skip": ["webpage", "configs"]
+                "player_client": ["android"]
             }
         },
         "http_headers": ANDROID_HTTP_HEADERS
