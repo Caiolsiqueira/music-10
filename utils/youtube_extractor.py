@@ -138,10 +138,59 @@ def download_audio_via_cobalt(youtube_url: str, bitrate_kbps: int = 192) -> Opti
 def extract_video_info(url: str) -> Dict[str, Any]:
     """
     Obtém metadados rápidos do vídeo do YouTube sem fazer o download completo.
+    Prioriza a API pública oEmbed do YouTube para evitar 100% de bloqueios 'Sign in to confirm you're not a bot'.
     """
-    import yt_dlp
-
     clean_url = normalize_youtube_url(url)
+    
+    # Extrai o ID do vídeo para thumbnails de alta qualidade
+    video_id = ""
+    match = re.search(r"v=([a-zA-Z0-9_-]{11})", clean_url)
+    if match:
+        video_id = match.group(1)
+
+    # 1. Motor Primário: YouTube oEmbed API (Rápido, sem bloqueio de bot em nuvem)
+    try:
+        from urllib.parse import quote
+        oembed_url = f"https://www.youtube.com/oembed?url={quote(clean_url)}&format=json"
+        resp = requests.get(oembed_url, headers=ANDROID_HTTP_HEADERS, timeout=6)
+        if resp.status_code == 200:
+            data = resp.json()
+            title = data.get("title", "Áudio sem título")
+            uploader = data.get("author_name", "Artista Desconhecido")
+            thumbnail = f"https://i.ytimg.com/vi/{video_id}/maxresdefault.jpg" if video_id else data.get("thumbnail_url", "")
+            
+            inferred_artist = uploader
+            inferred_title = title
+            if " - " in title:
+                parts = title.split(" - ", 1)
+                inferred_artist = parts[0].strip()
+                inferred_title = parts[1].strip()
+
+            clean_inferred_title = re.sub(
+                r"\s*[\(\[](?:Official\s*(?:Music\s*)?Video|Audio|Lyric\s*Video|Clipe\s*Oficial|Video\s*Oficial)[\)\]]",
+                "",
+                inferred_title,
+                flags=re.IGNORECASE
+            ).strip()
+
+            return {
+                "success": True,
+                "clean_url": clean_url,
+                "title": title,
+                "inferred_title": clean_inferred_title or inferred_title,
+                "inferred_artist": inferred_artist,
+                "uploader": uploader,
+                "duration": 0,
+                "duration_formatted": "Faixa de Áudio",
+                "thumbnail": thumbnail,
+                "view_count": 0,
+                "description": f"Faixa oficial de {uploader}"
+            }
+    except Exception:
+        pass
+
+    # 2. Motor Secundário: yt-dlp (Fallback)
+    import yt_dlp
     ffmpeg_bin = get_ffmpeg_path()
 
     ydl_opts = {
