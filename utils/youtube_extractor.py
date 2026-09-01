@@ -79,13 +79,33 @@ def format_duration(seconds: Optional[int]) -> str:
 
 def download_audio_via_cobalt(youtube_url: str, bitrate_kbps: int = 192) -> Optional[bytes]:
     """
-    Fallback de conversão via instâncias públicas do Cobalt API.
+    Fallback de conversão via instâncias personalizadas ou públicas do Cobalt API.
     """
-    api_endpoints = [
+    api_endpoints = []
+    
+    # 1. Verifica se há uma URL personalizada configurada nos Secrets do Streamlit ou variáveis de ambiente
+    try:
+        import streamlit as st
+        if hasattr(st, "secrets") and "COBALT_API_URL" in st.secrets:
+            custom_url = st.secrets["COBALT_API_URL"].strip()
+            if custom_url:
+                api_endpoints.append(custom_url)
+    except Exception:
+        pass
+        
+    env_custom = os.environ.get("COBALT_API_URL", "").strip()
+    if env_custom and env_custom not in api_endpoints:
+        api_endpoints.append(env_custom)
+
+    # 2. Instâncias públicas de contingência
+    public_endpoints = [
         "https://api.cobalt.tools/api/json",
         "https://api.cobalt.tools/",
         "https://co.eepy.today/api/json"
     ]
+    for ep in public_endpoints:
+        if ep not in api_endpoints:
+            api_endpoints.append(ep)
     
     headers = {
         "Accept": "application/json",
